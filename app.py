@@ -25,7 +25,7 @@ def load_model():
     )
     # تحميل الأوزان
     try:
-        model.load_state_dict(torch.load("best_model.pth", map_location=device))
+        model.load_state_dict(torch.load("SegFormer_MiTB2_Best.pth", map_location=device))
     except FileNotFoundError:
         st.error("Error: Model file 'best_model.pth' not found.")
         return None
