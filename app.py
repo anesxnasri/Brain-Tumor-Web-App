@@ -7,23 +7,21 @@ import segmentation_models_pytorch as smp
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
 
-# 1. إعدادات الصفحة
 st.set_page_config(page_title="Brain Tumor Segmentation", page_icon="🧠")
 
 st.title("🧠 Brain Tumor Segmentation AI")
 st.write("Upload an MRI image to detect the tumor area using SegFormer (MiT-B2).")
 
-# 2. تحميل الموديل (يتم تحميله مرة واحدة فقط لتسريع الموقع)
 @st.cache_resource
 def load_model():
-    device = torch.device("cpu") # نستخدم CPU في السيرفر المجاني
+    device = torch.device("cpu") 
     model = smp.Segformer(
         encoder_name="mit_b2",
         encoder_weights=None,
         in_channels=3,
         classes=1,
     )
-    # تحميل الأوزان
+    
     try:
         model.load_state_dict(torch.load("SegFormer_MiTB2_Best.pth", map_location=device))
     except FileNotFoundError:
@@ -36,7 +34,6 @@ def load_model():
 
 model = load_model()
 
-# 3. إعدادات المعالجة
 IMAGE_SIZE = 352
 transform = A.Compose([
     A.Resize(IMAGE_SIZE, IMAGE_SIZE),
@@ -44,41 +41,38 @@ transform = A.Compose([
     ToTensorV2()
 ])
 
-# 4. واجهة المستخدم
+
 uploaded_file = st.file_uploader("Choose an MRI Image...", type=["jpg", "png", "jpeg"])
 
 if uploaded_file is not None:
-    # عرض الصورة الأصلية
+    
     image = Image.open(uploaded_file).convert("RGB")
     st.image(image, caption="Uploaded MRI", use_column_width=True)
     
     if st.button("🔍 Detect Tumor"):
         with st.spinner("Analyzing..."):
-            # 1. تحويل الصورة لمصفوفة
+            
             img_np = np.array(image)
             
-            # 2. التجهيز للموديل (Augmentation)
-            # هنا يتم تصغير الصورة لـ 352x352 للمعالجة
+            
             augmented = transform(image=img_np)["image"].unsqueeze(0)
             
-            # 3. التوقع
+            
             with torch.no_grad():
                 output = model(augmented)
                 pred_mask = torch.sigmoid(output).squeeze().numpy()
                 pred_mask = (pred_mask > 0.5).astype(np.uint8) * 255
             
-            # 4. (التصحيح هنا) نجهز صورة للعرض بحجم 352x352 لتطابق القناع
-            # نقوم بتغيير حجم الصورة الأصلية لتصبح بنفس حجم القناع الناتج
+            
             img_resized = cv2.resize(img_np, (IMAGE_SIZE, IMAGE_SIZE))
             
-            # 5. تلوين القناع
-            mask_colored = np.zeros_like(img_resized) # نستخدم الصورة المصغرة كمرجع
-            mask_colored[:, :, 0] = pred_mask # الآن الأحجام متطابقة (352x352)
             
-            # 6. دمج الصورة الأصلية مع القناع
+            mask_colored = np.zeros_like(img_resized)
+            mask_colored[:, :, 0] = pred_mask
+            
+            
             overlay = cv2.addWeighted(img_resized, 0.7, mask_colored, 0.3, 0)
             
-            # 7. عرض النتائج
             col1, col2 = st.columns(2)
             with col1:
                 st.image(pred_mask, caption="Predicted Mask", use_column_width=True)
