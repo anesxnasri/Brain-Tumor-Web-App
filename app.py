@@ -54,30 +54,35 @@ if uploaded_file is not None:
     
     if st.button("🔍 Detect Tumor"):
         with st.spinner("Analyzing..."):
-            # تحويل الصورة للمعالجة
+            # 1. تحويل الصورة لمصفوفة
             img_np = np.array(image)
-            augmented = transform(image=img_np)["image"].unsqueeze(0) # إضافة Batch Dimension
             
-            # التوقع
+            # 2. التجهيز للموديل (Augmentation)
+            # هنا يتم تصغير الصورة لـ 352x352 للمعالجة
+            augmented = transform(image=img_np)["image"].unsqueeze(0)
+            
+            # 3. التوقع
             with torch.no_grad():
                 output = model(augmented)
                 pred_mask = torch.sigmoid(output).squeeze().numpy()
                 pred_mask = (pred_mask > 0.5).astype(np.uint8) * 255
             
-            # تلوين القناع (للعرض الجميل)
-            # نحول القناع لملون (أحمر مثلاً)
-            mask_colored = np.zeros_like(img_np)
-            mask_colored[:, :, 0] = pred_mask # القناة الحمراء فقط
-            
-            # دمج الصورة الأصلية مع القناع
+            # 4. (التصحيح هنا) نجهز صورة للعرض بحجم 352x352 لتطابق القناع
+            # نقوم بتغيير حجم الصورة الأصلية لتصبح بنفس حجم القناع الناتج
             img_resized = cv2.resize(img_np, (IMAGE_SIZE, IMAGE_SIZE))
+            
+            # 5. تلوين القناع
+            mask_colored = np.zeros_like(img_resized) # نستخدم الصورة المصغرة كمرجع
+            mask_colored[:, :, 0] = pred_mask # الآن الأحجام متطابقة (352x352)
+            
+            # 6. دمج الصورة الأصلية مع القناع
             overlay = cv2.addWeighted(img_resized, 0.7, mask_colored, 0.3, 0)
             
-            # عرض النتائج
+            # 7. عرض النتائج
             col1, col2 = st.columns(2)
             with col1:
-                st.image(pred_mask, caption="Predicted Mask (Black/White)", use_column_width=True)
+                st.image(pred_mask, caption="Predicted Mask", use_column_width=True)
             with col2:
-                st.image(overlay, caption="Tumor Overlay (Red)", use_column_width=True)
+                st.image(overlay, caption="Tumor Detection (Red Area)", use_column_width=True)
             
             st.success("Analysis Completed! ✅")
